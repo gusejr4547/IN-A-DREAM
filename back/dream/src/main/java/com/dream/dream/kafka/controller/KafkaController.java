@@ -7,11 +7,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.async.DeferredResult;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @CrossOrigin("*")
@@ -21,6 +28,34 @@ import java.time.temporal.ChronoUnit;
 public class KafkaController {
 
     private final KafkaProducerService kafkaProducerService;
+
+    private final KafkaTemplate<String, String> kafkaTemplate;
+
+    private final Map<String, DeferredResult<ResponseEntity>> deferredResults = new ConcurrentHashMap<>();
+
+    private
+    @PostMapping("test")
+    public DeferredResult<ResponseEntity> getDiary(Long id, String diary){
+        DeferredResult<ResponseEntity> deferredResult = new DeferredResult<>();
+
+        this.deferredResults.put(id, deferredResult);
+
+        kafkaTemplate.send("diary", diary);
+        return deferredResult;
+    }
+
+    @KafkaListener(topics = "diary")
+    public void listen(String message){
+        String diary = message + "이것은 받은 메세지";
+
+        ResponseEntity responseEntity = new ResponseEntity(diary, HttpStatus.OK);
+        if (this.deferredResults.containsKey(requestId)) {
+            ResponseEntity<?> responseEntity = ResponseEntity.ok("Processed request: " + requestId);
+            this.deferredResults.get(requestId).setResult(responseEntity);
+            this.deferredResults.remove(requestId);
+        }
+    }
+
 
     /**
      * 테스트 로그 생성 컨트롤러
