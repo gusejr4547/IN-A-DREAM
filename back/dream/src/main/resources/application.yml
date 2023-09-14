@@ -12,3 +12,4 @@ message:
   topic:
     name: member_log
     pointName: point_log
+    diaryName: diary
